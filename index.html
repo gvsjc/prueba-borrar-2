@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LM Studio Chatbot</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --panel-border: #334155;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --user-msg-bg: #2563eb;
+            --user-msg-text: #ffffff;
+            --bot-msg-bg: #334155;
+            --bot-msg-text: #f1f5f9;
+            --error-bg: #7f1d1d;
+            --error-text: #fca5a5;
+            --font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: var(--panel-bg);
+            border-bottom: 1px solid var(--panel-border);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #10b981;
+            box-shadow: 0 0 8px #10b981;
+        }
+
+        .settings-bar {
+            background-color: #141d2b;
+            border-bottom: 1px solid var(--panel-border);
+            padding: 10px 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .setting-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 220px;
+        }
+
+        .setting-group label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            font-weight: 600;
+        }
+
+        .setting-group input {
+            width: 100%;
+            background-color: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .setting-group input:focus {
+            border-color: var(--accent-color);
+        }
+
+        #chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            scroll-behavior: smooth;
+        }
+
+        #chat-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #chat-container::-webkit-scrollbar-thumb {
+            background-color: var(--panel-border);
+            border-radius: 3px;
+        }
+
+        .message-row {
+            display: flex;
+            flex-direction: column;
+            max-width: 80%;
+            animation: fadeIn 0.2s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-row.user {
+            align-self: flex-end;
+            align-items: flex-end;
+        }
+
+        .message-row.assistant, .message-row.thinking, .message-row.error {
+            align-self: flex-start;
+            align-items: flex-start;
+        }
+
+        .sender-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            padding: 0 4px;
+        }
+
+        .message-bubble {
+            padding: 12px 16px;
+            border-radius: 14px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+
+        .user .message-bubble {
+            background-color: var(--user-msg-bg);
+            color: var(--user-msg-text);
+            border-bottom-right-radius: 2px;
+        }
+
+        .assistant .message-bubble {
+            background-color: var(--bot-msg-bg);
+            color: var(--bot-msg-text);
+            border-bottom-left-radius: 2px;
+        }
+
+        .error .message-bubble {
+            background-color: var(--error-bg);
+            color: var(--error-text);
+            border: 1px solid #f87171;
+            border-bottom-left-radius: 2px;
+        }
+
+        .thinking-bubble {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background-color: var(--bot-msg-bg);
+            padding: 14px 18px;
+            border-radius: 14px;
+            border-bottom-left-radius: 2px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--text-secondary);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1.0); }
+        }
+
+        .chat-input-area {
+            background-color: var(--panel-bg);
+            border-top: 1px solid var(--panel-border);
+            padding: 15px 20px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        #message-input {
+            flex: 1;
+            background-color: var(--bg-color);
+            border: 1px solid var(--panel-border);
+            color: var(--text-primary);
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+            resize: none;
+            height: 48px;
+            font-family: inherit;
+        }
+
+        #message-input:focus {
+            border-color: var(--accent-color);
+        }
+
+        .btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0 20px;
+            height: 48px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: background-color 0.2s, opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-clear {
+            background-color: transparent;
+            border: 1px solid var(--panel-border);
+            color: var(--text-secondary);
+            height: 32px;
+            padding: 0 12px;
+            font-size: 0.8rem;
+        }
+
+        .btn-clear:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+        }
+
+        @media (max-width: 600px) {
+            .message-row {
+                max-width: 90%;
+            }
+            .setting-group {
+                min-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <div class="status-dot"></div>
+            <span>LM Studio Assistant</span>
+        </div>
+        <button id="clear-btn" class="btn btn-clear">Clear Chat</button>
+    </header>
+
+    <div class="settings-bar">
+        <div class="setting-group">
+            <label for="host-input">LM Studio Host/IP:</label>
+            <input type="text" id="host-input" value="http://127.0.0.1:1234" placeholder="http://127.0.0.1:1234">
+        </div>
+        <div class="setting-group">
+            <label for="model-input">Model Name:</label>
+            <input type="text" id="model-input" value="google/gemma-4-e4b" placeholder="e.g. google/gemma-4-e4b">
+        </div>
+    </div>
+
+    <main id="chat-container">
+        <!-- Messages will be rendered dynamically here -->
+    </main>
+
+    <footer class="chat-input-area">
+        <input 
+            type="text" 
+            id="message-input" 
+            placeholder="Type your message here... (Press Enter to send)" 
+            autocomplete="off"
+        >
+        <button id="send-btn" class="btn">Send</button>
+    </footer>
+
+    <script>
+        // Internal conversation history array initialized with the system prompt
+        const messages = [
+            { "role": "system", "content": "You are a friendly assistant for high school students. Answer briefly." }
+        ];
+
+        let isWaitingForResponse = false;
+
+        // DOM Element references
+        const chatContainer = document.getElementById('chat-container');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const hostInput = document.getElementById('host-input');
+        const modelInput = document.getElementById('model-input');
+
+        // Function to scroll chat smoothly to the latest message
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Appends a single message bubble to the visual chat layout
+        function appendMessageToUI(role, content) {
+            const rowDiv = document.createElement('div');
+            rowDiv.classList.add('message-row', role);
+
+            const senderLabel = document.createElement('div');
+            senderLabel.classList.add('sender-label');
+            senderLabel.textContent = role === 'user' ? 'You' : role === 'assistant' ? 'Assistant' : 'System';
+
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.classList.add('message-bubble');
+            bubbleDiv.textContent = content;
+
+            rowDiv.appendChild(senderLabel);
+            rowDiv.appendChild(bubbleDiv);
+
+            chatContainer.appendChild(rowDiv);
+            scrollToBottom();
+            return rowDiv;
+        }
+
+        // Displays animated "Thinking..." indicator
+        function showThinkingIndicator() {
+            const rowDiv = document.createElement('div');
+            rowDiv.classList.add('message-row', 'thinking');
+            rowDiv.id = 'thinking-indicator';
+
+            const senderLabel = document.createElement('div');
+            senderLabel.classList.add('sender-label');
+            senderLabel.textContent = 'Assistant';
+
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.classList.add('thinking-bubble');
+            
+            const textSpan = document.createElement('span');
+            textSpan.textContent = 'Thinking';
+            textSpan.style.color = 'var(--text-secondary)';
+            textSpan.style.fontSize = '0.9rem';
+            textSpan.style.marginRight = '6px';
+
+            bubbleDiv.appendChild(textSpan);
+            for (let i = 0; i < 3; i++) {
+                const dot = document.createElement('div');
+                dot.classList.add('dot');
+                bubbleDiv.appendChild(dot);
+            }
+
+            rowDiv.appendChild(senderLabel);
+            rowDiv.appendChild(bubbleDiv);
+            chatContainer.appendChild(rowDiv);
+            scrollToBottom();
+        }
+
+        // Removes "Thinking..." indicator from chat
+        function removeThinkingIndicator() {
+            const indicator = document.getElementById('thinking-indicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        }
+
+        // Displays error messages in chat
+        function appendErrorToUI(errorMessage) {
+            const rowDiv = document.createElement('div');
+            rowDiv.classList.add('message-row', 'error');
+
+            const senderLabel = document.createElement('div');
+            senderLabel.classList.add('sender-label');
+            senderLabel.textContent = 'System Error';
+
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.classList.add('message-bubble');
+            bubbleDiv.textContent = `Error: ${errorMessage}`;
+
+            rowDiv.appendChild(senderLabel);
+            rowDiv.appendChild(bubbleDiv);
+            chatContainer.appendChild(rowDiv);
+            scrollToBottom();
+        }
+
+        async function sendMessage() {
+            const userText = messageInput.value.trim();
+            if (!userText || isWaitingForResponse) return;
+
+            // Get settings values and sanitize host URL (removes markdown brackets, trailing slashes, quotes)
+            let hostUrl = hostInput.value.trim();
+            const mdMatch = hostUrl.match(/\((https?:\/\/[^)]+)\)/);
+            if (mdMatch) hostUrl = mdMatch[1];
+            hostUrl = hostUrl.replace(/[\[\]'"]/g, '').trim();
+            if (hostUrl && !/^https?:\/\//i.test(hostUrl)) {
+                hostUrl = 'http://' + hostUrl;
+            }
+            hostUrl = hostUrl.replace(/\/+$/, '');
+            hostInput.value = hostUrl; // Update input field visually to clean value
+
+            const modelName = modelInput.value.trim() || 'google/gemma-4-e4b';
+
+            // 1. Append User message to messages state & UI
+            messages.push({ "role": "user", "content": userText });
+            appendMessageToUI('user', userText);
+
+            // Clear input field and set loading state
+            messageInput.value = '';
+            isWaitingForResponse = true;
+            sendBtn.disabled = true;
+
+            // 2. Display "Thinking..." indicator
+            showThinkingIndicator();
+
+            try {
+                // Construct target endpoint URL
+                const endpoint = `${hostUrl}/v1/chat/completions`;
+
+                // 3. Send fetch request to local LM Studio server
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: messages
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server returned HTTP ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                // 4. Validate and read assistant reply from response object
+                if (data && data.choices && data.choices[0] && data.choices[0].message) {
+                    const assistantReply = data.choices[0].message.content;
+
+                    // Remove thinking indicator and render response
+                    removeThinkingIndicator();
+
+                    // Append reply to messages array and render in chat
+                    messages.push({ "role": "assistant", "content": assistantReply });
+                    appendMessageToUI('assistant', assistantReply);
+                } else {
+                    throw new Error("Invalid response structure received from API.");
+                }
+
+            } catch (err) {
+                // Remove indicator and show error reason on failure
+                removeThinkingIndicator();
+                console.error("Chatbot Fetch Error:", err);
+                appendErrorToUI(err.message || "Failed to fetch response from LM Studio.");
+            } finally {
+                // Reset state to allow further sending
+                isWaitingForResponse = false;
+                sendBtn.disabled = false;
+                messageInput.focus();
+            }
+        }
+
+        // Send button click event
+        sendBtn.addEventListener('click', sendMessage);
+
+        // Send on Enter keypress
+        messageInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Clear Chat logic
+        clearBtn.addEventListener('click', () => {
+            // Reset conversation array keeping initial system message
+            messages.length = 1;
+            chatContainer.innerHTML = '';
+        });
+
+        // Focus input on initial page load
+        window.addEventListener('load', () => {
+            messageInput.focus();
+        });
+    </script>
+</body>
+</html>
